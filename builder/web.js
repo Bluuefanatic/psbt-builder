@@ -7,29 +7,29 @@ import { BuilderError } from './errors.js';
 const PORT = Number(process.env.PORT ?? 3000);
 
 function readJsonBody(req) {
-    return new Promise((resolve, reject) => {
-        let body = '';
-        req.on('data', (chunk) => {
-            body += chunk;
-        });
-        req.on('end', () => {
-            try {
-                resolve(body.length ? JSON.parse(body) : {});
-            } catch {
-                reject(new BuilderError('INVALID_JSON', 'Request body must be valid JSON'));
-            }
-        });
-        req.on('error', reject);
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
     });
+    req.on('end', () => {
+      try {
+        resolve(body.length ? JSON.parse(body) : {});
+      } catch {
+        reject(new BuilderError('INVALID_JSON', 'Request body must be valid JSON'));
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 function sendJson(res, statusCode, payload) {
-    res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
-    res.end(`${JSON.stringify(payload)}\n`);
+  res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
+  res.end(`${JSON.stringify(payload)}\n`);
 }
 
 function htmlPage() {
-    return `<!doctype html>
+  return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -45,7 +45,6 @@ function htmlPage() {
     .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #ececec; font-size: 12px; }
     .change { background: #d7f2ff; }
     ul { padding-left: 18px; }
-    .mono { font-family: monospace; font-size: 12px; }
     .warn { color: #8a4b00; }
   </style>
 </head>
@@ -109,20 +108,19 @@ function htmlPage() {
         const report = await response.json();
 
         if (!response.ok || report.ok === false) {
-          statusEl.textContent = `Error: ${ report.error?.code ?? 'BUILD_FAILED' } - ${ report.error?.message ?? 'Unknown error' } `;
+          statusEl.textContent = 'Error: ' + (report.error?.code ?? 'BUILD_FAILED') + ' - ' + (report.error?.message ?? 'Unknown error');
           return;
         }
 
         statusEl.textContent = 'Success';
 
-        summaryEl.innerHTML = `
-        < p > <strong>Total Inputs:</strong> ${ report.selected_inputs.length }</p >
-          <p><strong>Total Outputs:</strong> ${report.outputs.length}</p>
-          <p><strong>Fee:</strong> ${report.fee_sats} sats</p>
-          <p><strong>Fee Rate:</strong> ${report.fee_rate_sat_vb} sat/vB</p>
-          <p><strong>RBF Enabled:</strong> ${report.rbf_enabled}</p>
-          <p><strong>Locktime:</strong> ${report.locktime} (${report.locktime_type})</p>
-    `;
+        summaryEl.innerHTML =
+          '<p><strong>Total Inputs:</strong> ' + report.selected_inputs.length + '</p>' +
+          '<p><strong>Total Outputs:</strong> ' + report.outputs.length + '</p>' +
+          '<p><strong>Fee:</strong> ' + report.fee_sats + ' sats</p>' +
+          '<p><strong>Fee Rate:</strong> ' + report.fee_rate_sat_vb + ' sat/vB</p>' +
+          '<p><strong>RBF Enabled:</strong> ' + report.rbf_enabled + '</p>' +
+          '<p><strong>Locktime:</strong> ' + report.locktime + ' (' + report.locktime_type + ')</p>';
 
         if (report.warnings.length === 0) {
           warningsEl.appendChild(li('None'));
@@ -131,17 +129,15 @@ function htmlPage() {
         }
 
         report.selected_inputs.forEach((input) => {
-          inputsEl.appendChild(li(`${ input.value_sats } sats | ${ input.txid }:${ input.vout } `));
+          inputsEl.appendChild(li(input.value_sats + ' sats | ' + input.txid + ':' + input.vout));
         });
 
         report.outputs.forEach((output) => {
-          const label = output.is_change
-            ? `[CHANGE] ${ output.value_sats } sats | ${ output.script_type } `
-            : `${ output.value_sats } sats | ${ output.script_type } `;
-          outputsEl.appendChild(li(label, output.is_change ? 'change badge' : ''));
+          const label = (output.is_change ? '[CHANGE] ' : '') + output.value_sats + ' sats | ' + output.script_type;
+          outputsEl.appendChild(li(label, output.is_change ? 'badge change' : ''));
         });
       } catch (error) {
-        statusEl.textContent = `Error: ${ error.message } `;
+        statusEl.textContent = 'Error: ' + error.message;
       }
     });
   </script>
@@ -150,34 +146,34 @@ function htmlPage() {
 }
 
 const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host}`);
+  const url = new URL(req.url, `http://${req.headers.host}`);
 
-    if (req.method === 'GET' && url.pathname === '/api/health') {
-        return sendJson(res, 200, { ok: true });
+  if (req.method === 'GET' && url.pathname === '/api/health') {
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/build') {
+    try {
+      const fixture = await readJsonBody(req);
+      const report = buildTransactionReport(fixture);
+      return sendJson(res, 200, report);
+    } catch (error) {
+      const payload = error instanceof BuilderError
+        ? { ok: false, error: { code: error.code, message: error.message } }
+        : { ok: false, error: { code: 'BUILD_FAILED', message: error instanceof Error ? error.message : 'Unknown error' } };
+      return sendJson(res, 400, payload);
     }
+  }
 
-    if (req.method === 'POST' && url.pathname === '/api/build') {
-        try {
-            const fixture = await readJsonBody(req);
-            const report = buildTransactionReport(fixture);
-            return sendJson(res, 200, report);
-        } catch (error) {
-            const payload = error instanceof BuilderError
-                ? { ok: false, error: { code: error.code, message: error.message } }
-                : { ok: false, error: { code: 'BUILD_FAILED', message: error instanceof Error ? error.message : 'Unknown error' } };
-            return sendJson(res, 400, payload);
-        }
-    }
+  if (req.method === 'GET' && url.pathname === '/') {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(htmlPage());
+    return;
+  }
 
-    if (req.method === 'GET' && url.pathname === '/') {
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-        res.end(htmlPage());
-        return;
-    }
-
-    sendJson(res, 404, { ok: false, error: { code: 'NOT_FOUND', message: 'Route not found' } });
+  sendJson(res, 404, { ok: false, error: { code: 'NOT_FOUND', message: 'Route not found' } });
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-    console.log(`http://127.0.0.1:${PORT}`);
+  console.log(`http://127.0.0.1:${PORT}`);
 });
