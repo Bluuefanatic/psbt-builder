@@ -46,6 +46,7 @@ function htmlPage() {
     .change { background: #d7f2ff; }
     ul { padding-left: 18px; }
     .warn { color: #8a4b00; }
+    .mono { font-family: monospace; word-break: break-all; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -136,11 +137,14 @@ function htmlPage() {
           '<p><strong>Total Outputs:</strong> ' + report.outputs.length + '</p>' +
           '<p><strong>Fee:</strong> ' + report.fee_sats + ' sats</p>' +
           '<p><strong>Fee Rate:</strong> ' + report.fee_rate_sat_vb + ' sat/vB</p>' +
+          '<p><strong>Size (vbytes):</strong> ' + report.vbytes + '</p>' +
           '<p><strong>RBF Signaling:</strong> ' + report.rbf_signaling + '</p>';
 
         if (report.locktime > 0) {
           summaryEl.innerHTML += '<p><strong>Locktime:</strong> ' + report.locktime + ' (' + report.locktime_type + ')</p>';
         }
+
+        summaryEl.innerHTML += '<p><strong>PSBT (base64):</strong></p><div class="mono">' + report.psbt_base64.slice(0, 96) + '...</div>';
 
         if (report.warnings.length === 0) {
           warningsEl.appendChild(li('None'));
