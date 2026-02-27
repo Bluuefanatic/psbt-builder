@@ -7,29 +7,29 @@ import { BuilderError } from './errors.js';
 const PORT = Number(process.env.PORT ?? 3000);
 
 function readJsonBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', (chunk) => {
-      body += chunk;
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', (chunk) => {
+            body += chunk;
+        });
+        req.on('end', () => {
+            try {
+                resolve(body.length ? JSON.parse(body) : {});
+            } catch {
+                reject(new BuilderError('INVALID_JSON', 'Request body must be valid JSON'));
+            }
+        });
+        req.on('error', reject);
     });
-    req.on('end', () => {
-      try {
-        resolve(body.length ? JSON.parse(body) : {});
-      } catch {
-        reject(new BuilderError('INVALID_JSON', 'Request body must be valid JSON'));
-      }
-    });
-    req.on('error', reject);
-  });
 }
 
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
-  res.end(`${JSON.stringify(payload)}\n`);
+    res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
+    res.end(`${JSON.stringify(payload)}\n`);
 }
 
 function htmlPage() {
-  return `<!doctype html>
+    return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -146,34 +146,34 @@ function htmlPage() {
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
+    const url = new URL(req.url, `http://${req.headers.host}`);
 
-  if (req.method === 'GET' && url.pathname === '/api/health') {
-    return sendJson(res, 200, { ok: true });
-  }
-
-  if (req.method === 'POST' && url.pathname === '/api/build') {
-    try {
-      const fixture = await readJsonBody(req);
-      const report = buildTransactionReport(fixture);
-      return sendJson(res, 200, report);
-    } catch (error) {
-      const payload = error instanceof BuilderError
-        ? { ok: false, error: { code: error.code, message: error.message } }
-        : { ok: false, error: { code: 'BUILD_FAILED', message: error instanceof Error ? error.message : 'Unknown error' } };
-      return sendJson(res, 400, payload);
+    if (req.method === 'GET' && url.pathname === '/api/health') {
+        return sendJson(res, 200, { ok: true });
     }
-  }
 
-  if (req.method === 'GET' && url.pathname === '/') {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(htmlPage());
-    return;
-  }
+    if (req.method === 'POST' && url.pathname === '/api/build') {
+        try {
+            const fixture = await readJsonBody(req);
+            const report = buildTransactionReport(fixture);
+            return sendJson(res, 200, report);
+        } catch (error) {
+            const payload = error instanceof BuilderError
+                ? { ok: false, error: { code: error.code, message: error.message } }
+                : { ok: false, error: { code: 'BUILD_FAILED', message: error instanceof Error ? error.message : 'Unknown error' } };
+            return sendJson(res, 400, payload);
+        }
+    }
 
-  sendJson(res, 404, { ok: false, error: { code: 'NOT_FOUND', message: 'Route not found' } });
+    if (req.method === 'GET' && url.pathname === '/') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(htmlPage());
+        return;
+    }
+
+    sendJson(res, 404, { ok: false, error: { code: 'NOT_FOUND', message: 'Route not found' } });
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`http://127.0.0.1:${PORT}`);
+    console.log(`http://127.0.0.1:${PORT}`);
 });
