@@ -8,6 +8,8 @@ set -euo pipefail
 # This script is run once before grading to set up the environment.
 ###############################################################################
 
-
+if command -v npm >/dev/null 2>&1; then
+	npm install --silent
+fi
 
 echo "Setup complete"
