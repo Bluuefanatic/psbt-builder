@@ -50,7 +50,9 @@ function htmlPage() {
 </head>
 <body>
   <h1>Coin Smith PSBT Builder</h1>
-  <p>Paste a fixture JSON and click <strong>Build Transaction</strong>.</p>
+  <p>Load a fixture JSON file or paste JSON manually, then click <strong>Build Transaction</strong>.</p>
+  <input id="fixtureFile" type="file" accept="application/json,.json" />
+  <br />
   <textarea id="fixtureInput" placeholder='{"network":"mainnet", ...}'></textarea>
   <br />
   <button id="buildBtn">Build Transaction</button>
@@ -76,6 +78,7 @@ function htmlPage() {
   </div>
 
   <script>
+    const fixtureFile = document.getElementById('fixtureFile');
     const fixtureInput = document.getElementById('fixtureInput');
     const buildBtn = document.getElementById('buildBtn');
     const statusEl = document.getElementById('status');
@@ -90,6 +93,20 @@ function htmlPage() {
       if (className) item.className = className;
       return item;
     }
+
+    fixtureFile.addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        JSON.parse(text);
+        fixtureInput.value = text;
+        statusEl.textContent = 'Loaded fixture file: ' + file.name;
+      } catch (error) {
+        statusEl.textContent = 'Error: Invalid JSON file - ' + error.message;
+      }
+    });
 
     buildBtn.addEventListener('click', async () => {
       statusEl.textContent = 'Building...';
@@ -119,8 +136,11 @@ function htmlPage() {
           '<p><strong>Total Outputs:</strong> ' + report.outputs.length + '</p>' +
           '<p><strong>Fee:</strong> ' + report.fee_sats + ' sats</p>' +
           '<p><strong>Fee Rate:</strong> ' + report.fee_rate_sat_vb + ' sat/vB</p>' +
-          '<p><strong>RBF Enabled:</strong> ' + report.rbf_enabled + '</p>' +
-          '<p><strong>Locktime:</strong> ' + report.locktime + ' (' + report.locktime_type + ')</p>';
+          '<p><strong>RBF Signaling:</strong> ' + report.rbf_signaling + '</p>';
+
+        if (report.locktime > 0) {
+          summaryEl.innerHTML += '<p><strong>Locktime:</strong> ' + report.locktime + ' (' + report.locktime_type + ')</p>';
+        }
 
         if (report.warnings.length === 0) {
           warningsEl.appendChild(li('None'));
