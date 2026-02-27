@@ -1,0 +1,14 @@
+{
+  "name": "coin-smith",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build-cli": "node builder/cli.js",
+    "start-web": "node builder/web.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "bitcoinjs-lib": "^6.1.5"
+  }
+}
