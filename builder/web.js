@@ -372,9 +372,9 @@ function htmlPage() {
         }
 
         explainEl.innerHTML =
-          '<p><strong>UTXOs:</strong> These are the wallet\'s spendable coins. We selected enough inputs to cover outputs and fee.</p>' +
-          '<p><strong>Change:</strong> If money is left after payment + fee, it returns to the sender as change (unless it is dust).</p>' +
-          '<p><strong>Fee logic:</strong> Fee comes from fee rate × transaction size in vbytes. More inputs/outputs usually mean higher fee.</p>';
+          "<p><strong>UTXOs:</strong> These are the wallet's spendable coins. We selected enough inputs to cover outputs and fee.</p>" +
+          "<p><strong>Change:</strong> If money is left after payment + fee, it returns to the sender as change (unless it is dust).</p>" +
+          "<p><strong>Fee logic:</strong> Fee comes from fee rate \xD7 transaction size in vbytes. More inputs/outputs usually mean higher fee.</p>";
 
         report.selected_inputs.forEach((input) => {
           inputsEl.appendChild(li(input.value_sats + ' sats | ' + input.txid + ':' + input.vout));
