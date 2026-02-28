@@ -37,7 +37,9 @@ export function validateFixture(rawFixture) {
         throw new BuilderError('INVALID_FIXTURE', 'change must be an object');
     }
 
-    ensureInteger(fixture.fee_rate_sat_vb, 'INVALID_FIXTURE', 'fee_rate_sat_vb', 0);
+    if (typeof fixture.fee_rate_sat_vb !== 'number' || !isFinite(fixture.fee_rate_sat_vb) || fixture.fee_rate_sat_vb < 0) {
+        throw new BuilderError('INVALID_FIXTURE', 'fee_rate_sat_vb must be a non-negative number');
+    }
 
     if (fixture.rbf !== undefined && typeof fixture.rbf !== 'boolean') {
         throw new BuilderError('INVALID_FIXTURE', 'rbf must be a boolean when provided');

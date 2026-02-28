@@ -16,7 +16,7 @@ export function classifyLocktime(locktime) {
     return 'unix_timestamp';
 }
 
-export function computeSequence({ rbf, locktime }) {
+export function computeSequence({ rbf, locktime }) {//
     if (rbf) return 0xfffffffd;
     if (locktime > 0) return 0xfffffffe;
     return 0xffffffff;
