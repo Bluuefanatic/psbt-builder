@@ -371,10 +371,118 @@ function htmlPage() {
           });
         }
 
-        explainEl.innerHTML =
-          "<p><strong>UTXOs:</strong> These are the wallet's spendable coins. We selected enough inputs to cover outputs and fee.</p>" +
-          "<p><strong>Change:</strong> If money is left after payment + fee, it returns to the sender as change (unless it is dust).</p>" +
-          "<p><strong>Fee logic:</strong> Fee comes from fee rate \xD7 transaction size in vbytes. More inputs/outputs usually mean higher fee.</p>";
+        const hasSendAll   = report.warnings.some((w) => w.code === 'SEND_ALL');
+        const hasDust      = report.warnings.some((w) => w.code === 'DUST_CHANGE');
+        const hasHighFee   = report.warnings.some((w) => w.code === 'HIGH_FEE');
+        const hasRbf       = report.rbf_signaling;
+        const hasLocktime  = report.locktime > 0;
+
+        // Warning annotations shown inline next to each badge
+        const warnLabels = {
+          RBF_SIGNALING: 'Transaction opts in to Replace-By-Fee (nSequence \u2264 0xFFFFFFFD on every input).',
+          SEND_ALL: 'No change output was created \u2014 all leftover sats go to miners as extra fee.',
+          DUST_CHANGE: 'Change would have been below 546 sats (dust threshold) so it was burned as fee instead.',
+          HIGH_FEE: 'Fee is unusually high (> 1,000,000 sats or rate > 200 sat/vB). Double-check before signing.',
+        };
+
+        warningsEl.innerHTML = '';
+        if (report.warnings.length === 0) {
+          warningsEl.innerHTML = '<span class="ok">No warnings</span>';
+        } else {
+          report.warnings.forEach((warning) => {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'margin-bottom:6px';
+            const badge = document.createElement('span');
+            badge.className = 'warn';
+            badge.textContent = warning.code;
+            const note = document.createElement('span');
+            note.style.cssText = 'margin-left:8px;font-size:0.82em;color:#5f6b85';
+            note.textContent = warnLabels[warning.code] || '';
+            wrap.appendChild(badge);
+            wrap.appendChild(note);
+            warningsEl.appendChild(wrap);
+          });
+        }
+
+        let html = '';
+
+        html += "<p><strong>\uD83D\uDCBC What is a wallet tracking?</strong> " +
+          "A Bitcoin wallet does not hold coins directly \u2014 it tracks <em>UTXOs</em> (Unspent Transaction Outputs). " +
+          "Each UTXO is like a banknote: it has a fixed value and can only be spent whole. " +
+          "To make a payment, the wallet <em>selects</em> one or more UTXOs whose combined value covers the amount plus fee.</p>";
+
+        html += "<p><strong>\uD83C\uDFAF Why these inputs?</strong> " +
+          "This builder uses a <em>greedy</em> strategy: UTXOs are sorted by value (largest first) and picked one-by-one until the total is enough. " +
+          "Selecting fewer, larger UTXOs keeps the transaction small and cheap.</p>";
+
+        html += "<p><strong>\uD83D\uDCB8 Payments vs Change:</strong> " +
+          "Outputs are split into two kinds. <em>Payment outputs</em> go to the recipient. " +
+          "If the selected inputs are worth more than payment + fee, the leftover returns to the sender as a <em>change output</em> \u2014 " +
+          "just like getting coins back after handing over a large banknote.</p>";
+
+        html += "<p><strong>\u26A0\uFE0F Dust rule (546 sats minimum):</strong> " +
+          "A UTXO smaller than 546 satoshis is <em>dust</em>. Its value is so tiny that the fee to spend it later would cost more than the output itself. " +
+          "Safe wallets refuse to create dust outputs. " +
+          (hasDust
+            ? "Here, the leftover was below 546 sats, so the change was dropped and folded into the fee (see DUST_CHANGE warning)."
+            : "Here, the change of " + changeValue + " sats is safely above that threshold.") + "</p>";
+
+        if (hasSendAll) {
+          html += "<p><strong>\uD83D\uDEAB Send-all (no change):</strong> " +
+            "There was no leftover after paying outputs + fee, so no change output was created. " +
+            "All remaining sats became miner fee. This is flagged as SEND_ALL.</p>";
+        } else {
+          html += "<p><strong>\u2194\uFE0F Send-all vs creating change:</strong> " +
+            "When leftover equals exactly the fee, there is nothing to send back \u2014 the wallet does a <em>send-all</em> and all surplus becomes miner fee. " +
+            "This transaction has a change output of " + changeValue + " sats, so send-all did not apply.</p>";
+        }
+
+        html += "<p><strong>\uD83D\uDCCF Fee rate \u2192 vbytes \u2192 fee:</strong> " +
+          "Bitcoin fees are priced per <em>virtual byte</em> (vbyte) of transaction size. " +
+          "Larger transactions (more inputs or outputs) occupy more block space and therefore cost more. " +
+          "Formula: <code>fee = \u2308fee_rate \u00D7 vbytes\u2309</code>. " +
+          "This transaction is <strong>" + report.vbytes + " vbytes</strong> at <strong>" + report.fee_rate_sat_vb + " sat/vB</strong> = <strong>" + report.fee_sats + " sats</strong> fee. " +
+          "Note: adding a change output increases vbytes, which increases the required fee.</p>";
+
+        html += "<p><strong>\uD83D\uDCE6 What is a PSBT?</strong> " +
+          "A <em>Partially Signed Bitcoin Transaction</em> (PSBT, BIP-174) is an unsigned transaction bundled with metadata \u2014 " +
+          "previous output scripts, amounts, and derivation paths \u2014 needed by a hardware wallet or cold signer to safely verify and sign. " +
+          "The builder never touches private keys; it hands the PSBT to the signer. " +
+          "The base64 string above is that package.</p>";
+
+        if (hasRbf) {
+          html += "<p><strong>\uD83D\uDD04 RBF \u2014 Replace-By-Fee:</strong> " +
+            "Replace-By-Fee (BIP-125) lets the sender <em>re-broadcast</em> the same transaction with a higher fee if the original is stuck in the mempool. " +
+            "It is signaled by setting each input\u2019s <code>nSequence</code> to <code>0xFFFFFFFD</code> or lower. " +
+            "This transaction <strong>does</strong> signal RBF \u2014 every input has nSequence = 0xFFFFFFFD.</p>";
+        } else {
+          html += "<p><strong>\uD83D\uDD04 RBF \u2014 Replace-By-Fee:</strong> " +
+            "Replace-By-Fee lets a sender re-broadcast with a higher fee. " +
+            "It is signaled via <code>nSequence \u2264 0xFFFFFFFD</code>. " +
+            "This transaction does <strong>not</strong> signal RBF (nSequence = 0xFFFFFFFF), so it cannot be fee-bumped once broadcast.</p>";
+        }
+
+        if (hasLocktime) {
+          html += "<p><strong>\u23F3 Timelock (nLockTime = " + report.locktime + "):</strong> " +
+            "A timelock tells the network: <em>do not mine this transaction before a certain block or time</em>. " +
+            "Values below 500,000,000 are <em>block heights</em>; values at or above are <em>Unix timestamps</em>. " +
+            "This transaction uses locktime <strong>" + report.locktime + "</strong> (" + report.locktime_type + "), " +
+            (report.locktime_type === 'block_height'
+              ? "so miners will not include it before block " + report.locktime + "."
+              : "so miners will not include it before that Unix timestamp.") +
+            " Locktime also enables <em>anti-fee-sniping</em> when set to the current chain tip.</p>";
+        } else {
+          html += "<p><strong>\u23F3 Timelocks:</strong> " +
+            "<code>nLockTime</code> can lock a transaction until a future block height or Unix timestamp. " +
+            "This transaction has no timelock (nLockTime = 0).</p>";
+        }
+
+        if (hasHighFee) {
+          html += "<p><strong>\uD83D\uDEA8 High-fee warning:</strong> " +
+            "The fee on this transaction is unusually large. Verify the fee rate and amounts before signing.</p>";
+        }
+
+        explainEl.innerHTML = html;
 
         report.selected_inputs.forEach((input) => {
           inputsEl.appendChild(li(input.value_sats + ' sats | ' + input.txid + ':' + input.vout));
